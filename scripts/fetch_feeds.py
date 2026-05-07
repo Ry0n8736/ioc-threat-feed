@@ -1,8 +1,10 @@
 import requests
+import os
 import json
 import ipaddress
 from datetime import datetime, timezone
 from pathlib import Path
+from utils.logger import logger
 
 feed_file = Path("feeds/urls.txt")
 output_file = Path("output/combined_iocs.txt")
@@ -66,7 +68,7 @@ with open(feed_file, "r") as f:
 
 for url in urls:
     source_name = url.split("/")[2]
-    print(f"[+] Fetching {url}")
+    logger.info(f"Fetching {url}")
 
     response = requests.get(url, timeout=20)
 
