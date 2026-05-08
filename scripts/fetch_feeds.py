@@ -1,5 +1,6 @@
 # This script is designed to fetch IOCs (Indicators of Compromise) from a list of feed URLs, extract and normalize the IOCs, determine their types (IP or domain), calculate confidence scores based on the number of sources reporting each IOC, and save the results in both text and JSON formats. It also tracks the health of each feed and handles errors gracefully, logging any issues encountered during the fetching process.
 import requests
+import time
 
 # Import os and json for file handling, ipaddress for validating IPs, datetime for timestamps, and pathlib for path management
 import os
@@ -27,6 +28,8 @@ output_file = OUTPUT_DIR / "combined_iocs.txt"
 json_output_file = OUTPUT_DIR / "combined_iocs.json"
 
 feed_health_file = OUTPUT_DIR / "feed_health.json"
+
+suppressed_output_file = OUTPUT_DIR / "suppressed_iocs.json"
 
 # Below is the function that checks if a given value is a valid IP address, ensuring it is not private, loopback, multicast, or reserved, which helps in filtering out non-relevant IPs from the feeds.
 def is_valid_ip(value):
@@ -128,7 +131,7 @@ def calculate_confidence(source_count):
 
     return 40
 
-
+start_time = time.time()
 all_iocs = set()
 ioc_objects = {}
 current_time = datetime.now(timezone.utc).isoformat()
@@ -136,6 +139,7 @@ IOC_EXPIRATION_DAYS = 30
 
 # Below is the initialization of the feed health tracking dictionary. This will store the status, IOC count, and any errors encountered for each feed URL, allowing for monitoring the health and reliability of the feeds over time.
 feed_health = {}
+suppressed_iocs = []
 
 with open(feed_file, "r") as f:
     urls = [line.strip() for line in f if line.strip()]
@@ -166,7 +170,16 @@ for url in urls:
 
             line = normalize_ioc(line)
 
+# Below is the code that checks if the normalized line is in the suppression list, and if so, adds it to the suppressed IOCs list with a reason for suppression, and skips further processing for that line.
             if line in suppressions:
+
+                suppressed_iocs.append(
+                    {
+                        "ioc": line,
+                        "reason": "manual_suppression"
+                    }
+                )
+
                 continue
 
             ioc_type = get_ioc_type(line)
@@ -251,10 +264,29 @@ for url in urls:
 with open(output_file, "w") as f:
     for ioc in sorted(all_iocs):
         f.write(ioc + "\n")
+        
 with open(json_output_file, "w") as f:
     json.dump(list(ioc_objects.values()), f, indent=4)
 
 with open(feed_health_file, "w") as f:
     json.dump(feed_health, f, indent=4)
 
+with open(suppressed_output_file, "w") as f:
+    json.dump(suppressed_iocs, f, indent=4)
+
+execution_time = round(time.time() - start_time, 2)
 print(f"[+] Saved {len(all_iocs)} IOCs")
+
+print(f"[+] Execution Time: {execution_time} seconds")
+
+print(f"[+] Feeds Processed: {len(urls)}")
+
+failed_feeds = sum(
+    1
+    for feed in feed_health.values()
+    if feed["status"] == "failed"
+)
+
+print(f"[+] Feeds Failed: {failed_feeds}")
+
+print(f"[+] Suppressed IOCs: {len(suppressed_iocs)}")
