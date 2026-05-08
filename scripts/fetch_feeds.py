@@ -26,11 +26,29 @@ json_output_file = OUTPUT_DIR / "combined_iocs.json"
 
 feed_health_file = OUTPUT_DIR / "feed_health.json"
 
+#Below is the function that checks if a given value is a valid IP address, ensuring it is not private, loopback, multicast, or reserved, which helps in filtering out non-relevant IPs from the feeds.
 def is_valid_ip(value):
+
     try:
-        ipaddress.ip_address(value)
+
+        ip = ipaddress.ip_address(value)
+
+        if ip.is_private:
+            return False
+
+        if ip.is_loopback:
+            return False
+
+        if ip.is_multicast:
+            return False
+
+        if ip.is_reserved:
+            return False
+
         return True
+
     except ValueError:
+
         return False
 
 #Below is the function that checks if a given value is a valid domain name, ensuring it doesn't contain spaces, URLs, or other invalid characters, and that it has a reasonable length.
@@ -120,12 +138,13 @@ feed_health = {}
 with open(feed_file, "r") as f:
     urls = [line.strip() for line in f if line.strip()]
 
-#Below is the main loop that processes each feed URL, fetches the content, extracts IOCs, and updates the data structures accordingly.
+#Below is the main loop that iterates through each feed URL, attempts to fetch the content, and processes each line to extract IOCs. It handles network errors and unexpected exceptions gracefully, logging any issues and updating the feed health status accordingly.
 for url in urls:
 
     try:
         feed_ioc_count = 0
-        source_name = url.split("//")[1]
+        source_url = url
+        source_label = Path(url).stem
 
         logger.info(f"Fetching {url}")
 
@@ -148,7 +167,12 @@ for url in urls:
                     
                     ioc_objects[line] = {
                         "ioc": line,
-                        "sources": [source_name],
+                        "sources": [
+                           {
+                                "label": source_label,
+                                "url": source_url
+                            }
+                    ],
                         "type": ioc_type,
                         "confidence": calculate_confidence(1),
                         "first_seen": current_time,
@@ -158,19 +182,31 @@ for url in urls:
 
                 else:
 
-                    if source_name not in ioc_objects[line]["sources"]:
+#Below is the code that updates existing IOC entries with new sources, refreshes the last seen timestamp, checks for expiration, and recalculates the confidence score based on the number of unique sources reporting the IOC.
+                    existing_labels = [
+                        source["label"]
+                        for source in ioc_objects[line]["sources"]
+                    ]
+
+                    if source_label not in existing_labels:
 
                         ioc_objects[line]["last_seen"] = current_time
-                        
+
                         ioc_objects[line]["expired"] = is_expired(
                             ioc_objects[line]["last_seen"]
                         )
 
-                        ioc_objects[line]["sources"].append(source_name)
+                        ioc_objects[line]["sources"].append(
+                            {
+                                "label": source_label,
+                                "url": source_url
+                            }
+                        )
 
                         source_count = len(ioc_objects[line]["sources"])
 
                         ioc_objects[line]["confidence"] = calculate_confidence(source_count)
+                   
 
         feed_health[url] = {
             "status": "healthy",
