@@ -17,8 +17,10 @@ FEEDS_DIR = BASE_DIR / "feeds"
 OUTPUT_DIR.mkdir(exist_ok=True)
 LOG_DIR.mkdir(exist_ok=True)
 
-#Below is for logging setup
+# Below is the definition of the feed file, suppression file, output files for combined IOCs in text and JSON formats, and a file to track feed health. These paths are constructed using pathlib for better cross-platform compatibility.
 feed_file = FEEDS_DIR / "urls.txt"
+
+suppression_file = FEEDS_DIR / "suppressions.txt"
 
 output_file = OUTPUT_DIR / "combined_iocs.txt"
 
@@ -26,7 +28,7 @@ json_output_file = OUTPUT_DIR / "combined_iocs.json"
 
 feed_health_file = OUTPUT_DIR / "feed_health.json"
 
-#Below is the function that checks if a given value is a valid IP address, ensuring it is not private, loopback, multicast, or reserved, which helps in filtering out non-relevant IPs from the feeds.
+# Below is the function that checks if a given value is a valid IP address, ensuring it is not private, loopback, multicast, or reserved, which helps in filtering out non-relevant IPs from the feeds.
 def is_valid_ip(value):
 
     try:
@@ -51,7 +53,7 @@ def is_valid_ip(value):
 
         return False
 
-#Below is the function that checks if a given value is a valid domain name, ensuring it doesn't contain spaces, URLs, or other invalid characters, and that it has a reasonable length.
+# Below is the function that checks if a given value is a valid domain name, ensuring it doesn't contain spaces, URLs, or other invalid characters, and that it has a reasonable length.
 def is_valid_domain(value):
 
     value = value.strip().lower()
@@ -82,7 +84,7 @@ def is_valid_domain(value):
 
     return True
 
-#Below is the function that determines the type of IOC (IP or domain) based on the value, using the validation functions defined earlier.
+# Below is the function that determines the type of IOC (IP or domain) based on the value, using the validation functions defined earlier.
 def get_ioc_type(value):
 
     if is_valid_ip(value):
@@ -112,7 +114,7 @@ def is_expired(last_seen):
 
     return datetime.now(timezone.utc) > expiration_time
 
-#Below is the function that calculates a confidence score for an IOC based on the number of unique sources that have reported it, assigning higher confidence to IOCs that are seen in multiple feeds, which can help prioritize which IOCs to investigate further.
+# Below is the function that calculates a confidence score for an IOC based on the number of unique sources that have reported it, assigning higher confidence to IOCs that are seen in multiple feeds, which can help prioritize which IOCs to investigate further.
 def calculate_confidence(source_count):
 
     if source_count >= 4:
@@ -132,13 +134,21 @@ ioc_objects = {}
 current_time = datetime.now(timezone.utc).isoformat()
 IOC_EXPIRATION_DAYS = 30
 
-# Below is the initialization of the main data structures: a set to store unique IOCs and a dictionary to store detailed information about each IOC, including its sources, type, confidence score, and timestamps for when it was first and last seen.
+# Below is the initialization of the feed health tracking dictionary. This will store the status, IOC count, and any errors encountered for each feed URL, allowing for monitoring the health and reliability of the feeds over time.
 feed_health = {}
 
 with open(feed_file, "r") as f:
     urls = [line.strip() for line in f if line.strip()]
 
-#Below is the main loop that iterates through each feed URL, attempts to fetch the content, and processes each line to extract IOCs. It handles network errors and unexpected exceptions gracefully, logging any issues and updating the feed health status accordingly.
+# Below is the code that reads the suppression file and creates a set of suppressed IOCs, which will be used to filter out any IOCs that should not be included in the final output, ensuring that known false positives or irrelevant IOCs are excluded from the dataset.
+with open(suppression_file, "r") as f:
+    suppressions = {
+        line.strip().lower()
+        for line in f
+        if line.strip()
+    }
+
+# Below is the main loop that iterates through each feed URL, attempts to fetch the content, and processes each line to extract IOCs. It handles network errors and unexpected exceptions gracefully, logging any issues and updating the feed health status accordingly.
 for url in urls:
 
     try:
@@ -155,6 +165,9 @@ for url in urls:
         for line in response.text.splitlines():
 
             line = normalize_ioc(line)
+
+            if line in suppressions:
+                continue
 
             ioc_type = get_ioc_type(line)
 
@@ -182,7 +195,7 @@ for url in urls:
 
                 else:
 
-#Below is the code that updates existing IOC entries with new sources, refreshes the last seen timestamp, checks for expiration, and recalculates the confidence score based on the number of unique sources reporting the IOC.
+# Below is the code that updates existing IOC entries with new sources, refreshes the last seen timestamp, checks for expiration, and recalculates the confidence score based on the number of unique sources reporting the IOC.
                     existing_labels = [
                         source["label"]
                         for source in ioc_objects[line]["sources"]
