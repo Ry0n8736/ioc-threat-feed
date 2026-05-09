@@ -6,7 +6,7 @@ This project is a custom IOC (Indicator of Compromise) ingestion and telemetry p
 
 The pipeline ingests threat intelligence feeds, normalizes and validates indicators, enriches metadata, applies suppression logic, and exports structured JSON telemetry for operational visibility.
 
-The long-term goal of the project is to complement enterprise SIEM and threat intelligence platforms such as Elastic Security and Recorded Future by adding:
+The long-term goal of the project is to complement enterprise SIEM and threat intelligence platforms by adding:
 
 * environment-specific filtering
 * custom suppression logic
