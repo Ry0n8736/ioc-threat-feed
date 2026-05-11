@@ -71,6 +71,34 @@ Each IOC currently supports:
 
 ---
 
+# IOC Enrichment
+
+The pipeline now includes a modular IOC enrichment stage designed to add contextual intelligence to collected indicators.
+
+The enrichment architecture is intended to simulate real-world threat intelligence engineering workflows where raw indicators are enhanced before SIEM ingestion or detection engineering use.
+
+Current enrichment capabilities include:
+
+* IOC-to-metadata correlation
+* Contextual telemetry generation
+* Modular enrichment processing pipeline
+* Structured enrichment export support
+
+The enrichment framework is designed for future integration with:
+
+* ASN enrichment
+* GeoIP enrichment
+* Reputation scoring
+* Passive DNS
+* WHOIS enrichment
+* Malware family tagging
+* Threat actor attribution
+* External intelligence APIs
+
+Enriched IOC records are exported as structured JSON telemetry for downstream analysis and experimentation.
+
+---
+
 # Suppression Architecture
 
 The pipeline supports policy-based IOC suppression using:
